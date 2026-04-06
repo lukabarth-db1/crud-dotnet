@@ -16,23 +16,17 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Id)
             .ValueGeneratedNever();
 
-        builder.Property(u => u.Name)
+        builder.Property<string>("_name")
+            .HasColumnName("Name")
             .IsRequired()
-            .HasMaxLength(Name.MaxLength)
-            .HasConversion(
-                name => name.Value,
-                value => Name.Create(value)
-            );
+            .HasMaxLength(Name.MaxLength);
 
-        builder.Property(u => u.Email)
+        builder.Property<string>("_email")
+            .HasColumnName("Email")
             .IsRequired()
-            .HasMaxLength(Email.MaxLength)
-            .HasConversion(
-                email => email.Value,
-                value => Email.Create(value)
-            );
+            .HasMaxLength(Email.MaxLength);
 
-        builder.HasIndex(u => u.Email)
+        builder.HasIndex("_email")
             .IsUnique();
 
         builder.Property(u => u.CreatedAt)
@@ -42,4 +36,3 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired(false);
     }
 }
-

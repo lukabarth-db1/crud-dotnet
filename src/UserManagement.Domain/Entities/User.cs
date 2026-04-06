@@ -1,49 +1,51 @@
-using UserManagement.Domain.Exceptions;
 using UserManagement.Domain.ValueObjects;
 
 namespace UserManagement.Domain.Entities;
 
 public sealed class User
 {
+    private string _name = null!;
+    private string _email = null!;
+
     public Guid Id { get; private set; }
-    public Name Name { get; private set; }
-    public Email Email { get; private set; }
+    public Name Name => Name.Create(_name);
+    public Email Email => Email.Create(_email);
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
-    
-    private User()
-    {
-        Name = null!;
-        Email = null!;
-    }
 
-    private User(Guid id, Name name, Email email, DateTime createdAt)
+    // Required by EF Core
+    private User() { }
+
+    private User(Guid id, string name, string email, DateTime createdAt)
     {
         Id = id;
-        Name = name;
-        Email = email;
+        _name = name;
+        _email = email;
         CreatedAt = createdAt;
     }
 
     public static User Create(string name, string email)
     {
+        var validName = Name.Create(name);
+        var validEmail = Email.Create(email);
+
         return new User(
             id: Guid.NewGuid(),
-            name: Name.Create(name),
-            email: Email.Create(email),
+            name: validName.Value,
+            email: validEmail.Value,
             createdAt: DateTime.UtcNow
         );
     }
 
     public void UpdateName(string newName)
     {
-        Name = Name.Create(newName);
+        _name = Name.Create(newName).Value;
         UpdatedAt = DateTime.UtcNow;
     }
 
     public void UpdateEmail(string newEmail)
     {
-        Email = Email.Create(newEmail);
+        _email = Email.Create(newEmail).Value;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -53,5 +55,4 @@ public sealed class User
         UpdateEmail(newEmail);
     }
 }
-
 

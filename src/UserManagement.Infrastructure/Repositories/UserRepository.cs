@@ -22,12 +22,12 @@ public sealed class UserRepository : IUserRepository
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         await _context.Users
             .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Email.Value == email, cancellationToken);
+            .FirstOrDefaultAsync(u => EF.Property<string>(u, "_email") == email, cancellationToken);
 
     public async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default) =>
         await _context.Users
             .AsNoTracking()
-            .OrderBy(u => u.Name)
+            .OrderBy(u => EF.Property<string>(u, "_name"))
             .ToListAsync(cancellationToken);
 
     public async Task AddAsync(User user, CancellationToken cancellationToken = default)
@@ -38,7 +38,8 @@ public sealed class UserRepository : IUserRepository
 
     public async Task UpdateAsync(User user, CancellationToken cancellationToken = default)
     {
-        _context.Users.Update(user);
+        _context.Users.Attach(user);
+        _context.Entry(user).State = EntityState.Modified;
         await _context.SaveChangesAsync(cancellationToken);
     }
 
