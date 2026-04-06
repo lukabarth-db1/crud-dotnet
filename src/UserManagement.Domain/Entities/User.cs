@@ -10,8 +10,7 @@ public sealed class User
     public Email Email { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
-
-    // Required by EF Core — properties are always set via Create() in real usage
+    
     private User()
     {
         Name = null!;
