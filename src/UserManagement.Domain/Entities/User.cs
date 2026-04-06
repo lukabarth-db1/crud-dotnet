@@ -12,8 +12,7 @@ public sealed class User
     public Email Email => Email.Create(_email);
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
-
-    // Required by EF Core
+    
     private User() { }
 
     private User(Guid id, string name, string email, DateTime createdAt)
@@ -55,4 +54,3 @@ public sealed class User
         UpdateEmail(newEmail);
     }
 }
-
