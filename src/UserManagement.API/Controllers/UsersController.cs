@@ -1,10 +1,12 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UserManagement.Application.DTOs;
 using UserManagement.Application.UseCases;
 
 namespace UserManagement.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/users")]
 public sealed class UsersController : ControllerBase

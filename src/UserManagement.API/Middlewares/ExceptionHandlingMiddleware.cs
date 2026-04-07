@@ -50,6 +50,7 @@ public sealed class ExceptionHandlingMiddleware
         exception switch
         {
             NotFoundException ex       => ((int)HttpStatusCode.NotFound, ex.Message),
+            UnauthorizedException ex   => ((int)HttpStatusCode.Unauthorized, ex.Message),
             DomainException ex         => ((int)HttpStatusCode.UnprocessableEntity, ex.Message),
             _                          => ((int)HttpStatusCode.InternalServerError, "An unexpected error occurred.")
         };

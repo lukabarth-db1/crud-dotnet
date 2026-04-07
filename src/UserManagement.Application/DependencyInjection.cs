@@ -9,6 +9,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        services.AddScoped<LoginUseCase>();
         services.AddScoped<CreateUserUseCase>();
         services.AddScoped<GetUserByIdUseCase>();
         services.AddScoped<GetAllUsersUseCase>();
