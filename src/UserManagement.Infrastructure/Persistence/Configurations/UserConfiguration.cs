@@ -32,7 +32,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property<string>("_passwordHash")
             .HasColumnName("PasswordHash")
             .IsRequired()
-            .HasMaxLength(PasswordHash.MaxLength);
+            .HasMaxLength(Password.MaxLength);
 
         builder.Property(u => u.CreatedAt)
             .IsRequired();
