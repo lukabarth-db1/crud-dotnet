@@ -12,7 +12,7 @@ O projeto segue os princípios da **Clean Architecture**, onde as dependências 
 src/
 ├── UserManagement.Domain/          # Entidades, Value Objects, Exceções
 ├── UserManagement.Application/     # Use Cases, DTOs, Interfaces, Validators
-├── UserManagement.Infrastructure/  # EF Core, SQLite, Repositórios
+├── UserManagement.Infrastructure/  # EF Core, SQLite, Repositórios, JWT, BCrypt
 └── UserManagement.API/             # Controllers, Middlewares, Program.cs
 
 tests/
@@ -37,6 +37,8 @@ Domain ← Application ← Infrastructure
 | Entity Framework Core | 10 | ORM |
 | SQLite | — | Banco de dados |
 | FluentValidation | 12 | Validação de DTOs |
+| BCrypt.Net | 4 | Hash de senhas |
+| JwtBearer | 10 | Autenticação via JWT |
 | xUnit | — | Testes unitários |
 | Moq | 4 | Mocking nos testes |
 
@@ -58,7 +60,22 @@ git clone <url-do-repositorio>
 cd crud
 ```
 
-### 2. Execute a API
+### 2. Configure a SecretKey via User Secrets
+
+A `SecretKey` do JWT **não deve ser commitada**. Configure-a localmente com User Secrets:
+
+```bash
+dotnet user-secrets init --project src/UserManagement.API
+dotnet user-secrets set "Jwt:SecretKey" "<sua-chave-de-32-chars-ou-mais>" --project src/UserManagement.API
+```
+
+Para gerar uma chave segura aleatória via PowerShell:
+
+```powershell
+[Convert]::ToBase64String((1..32 | ForEach-Object { [byte](Get-Random -Max 256) }))
+```
+
+### 3. Execute a API
 
 ```bash
 dotnet run --project src/UserManagement.API --launch-profile http
@@ -68,7 +85,7 @@ A API estará disponível em: **`http://localhost:5071`**
 
 > As migrations são aplicadas automaticamente na inicialização. O banco de dados SQLite (`usermanagement.db`) é criado na pasta da API.
 
-### 3. Execute os testes
+### 4. Execute os testes
 
 ```bash
 dotnet test
@@ -80,13 +97,48 @@ dotnet test
 
 ### Base URL: `http://localhost:5071`
 
-| Método | Rota | Descrição |
-|---|---|---|
-| `GET` | `/api/users` | Lista todos os usuários |
-| `GET` | `/api/users/{id}` | Busca usuário por ID |
-| `POST` | `/api/users` | Cria um novo usuário |
-| `PUT` | `/api/users/{id}` | Atualiza um usuário |
-| `DELETE` | `/api/users/{id}` | Remove um usuário |
+#### Autenticação
+
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | Autentica e retorna o token JWT | ❌ Pública |
+
+#### Usuários
+
+| Método | Rota | Descrição | Auth |
+|---|---|---|---|
+| `GET` | `/api/users` | Lista todos os usuários | ✅ Requer token |
+| `GET` | `/api/users/{id}` | Busca usuário por ID | ✅ Requer token |
+| `POST` | `/api/users` | Cria um novo usuário | ✅ Requer token |
+| `PUT` | `/api/users/{id}` | Atualiza um usuário | ✅ Requer token |
+| `DELETE` | `/api/users/{id}` | Remove um usuário | ✅ Requer token |
+
+---
+
+### POST `/api/auth/login`
+
+**Request Body:**
+```json
+{
+  "email": "joao@email.com",
+  "password": "senha123"
+}
+```
+
+**Response `200 OK`:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresAt": "2026-04-07T16:00:00Z"
+}
+```
+
+**Response `401 Unauthorized`:**
+```json
+{ "error": "Invalid credentials." }
+```
+
+> Use o token retornado nas demais requisições via header: `Authorization: Bearer <token>`
 
 ---
 
@@ -96,7 +148,8 @@ dotnet test
 ```json
 {
   "name": "Joao Silva",
-  "email": "joao@email.com"
+  "email": "joao@email.com",
+  "password": "senha123"
 }
 ```
 
@@ -106,7 +159,7 @@ dotnet test
   "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "name": "Joao Silva",
   "email": "joao@email.com",
-  "createdAt": "2026-04-06T15:00:00Z",
+  "createdAt": "2026-04-07T15:00:00Z",
   "updatedAt": null
 }
 ```
@@ -122,7 +175,7 @@ dotnet test
     "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     "name": "Joao Silva",
     "email": "joao@email.com",
-    "createdAt": "2026-04-06T15:00:00Z",
+    "createdAt": "2026-04-07T15:00:00Z",
     "updatedAt": null
   }
 ]
@@ -167,6 +220,7 @@ dotnet test
 
 | Status | Descrição |
 |---|---|
+| `401 Unauthorized` | Token ausente, inválido ou expirado |
 | `404 Not Found` | Recurso não encontrado |
 | `422 Unprocessable Entity` | Violação de regra de negócio ou dados inválidos |
 | `500 Internal Server Error` | Erro inesperado no servidor |
@@ -189,23 +243,66 @@ dotnet test
 Separação em camadas com dependências apontando para o domínio. A camada de domínio não conhece nenhuma outra camada.
 
 ### Value Objects
-`Name` e `Email` são Value Objects — encapsulam validação e são comparados pelo valor, não por referência. Um `Email` inválido simplesmente não pode ser criado.
+`Name`, `Email` e `Password` são Value Objects — encapsulam validação e são comparados pelo valor, não por referência. Um `Email` inválido simplesmente não pode ser criado.
 
 ```csharp
 var email = Email.Create("invalido"); // lança DomainException
 ```
 
 ### Use Case Pattern (SRP)
-Cada operação é uma classe isolada (`CreateUserUseCase`, `DeleteUserUseCase`, etc.), seguindo o Princípio da Responsabilidade Única.
+Cada operação é uma classe isolada (`CreateUserUseCase`, `LoginUseCase`, etc.), seguindo o Princípio da Responsabilidade Única.
 
 ### Repository Pattern
 `IUserRepository` abstrai o acesso ao banco. A Application só conhece a interface, nunca a implementação concreta — facilitando testes e troca de banco de dados.
+
+### Inversão de Dependência no JWT
+A camada Application define `IJwtTokenGenerator`, sem saber nada sobre JWT. A Infrastructure implementa com `JwtTokenGenerator`. O Use Case de login apenas chama a interface:
+
+```csharp
+return _tokenGenerator.GenerateToken(user); // retorna AuthResponse com token + expiresAt
+```
+
+### Encapsulamento da expiração
+O `JwtTokenGenerator` calcula `expiresAt` uma única vez e usa o mesmo valor tanto para o token quanto para o `AuthResponse`, garantindo consistência entre os dois.
+
+### Segurança nas credenciais inválidas
+O `LoginUseCase` retorna a mesma mensagem genérica para email inexistente e senha errada, prevenindo **enumeração de usuários**:
+
+```csharp
+if (user is null || !_passwordHasher.Verify(request.Password, user.GetPasswordHash()))
+    throw new UnauthorizedException("Invalid credentials.");
+```
 
 ### Fail Fast
 Validações acontecem na borda do sistema (FluentValidation no Controller) e no domínio (Value Objects), evitando que dados inválidos percorram toda a aplicação.
 
 ### Tratamento global de erros
 `ExceptionHandlingMiddleware` centraliza o tratamento de exceções, mapeando-as para os status HTTP corretos sem `try/catch` nos controllers.
+
+---
+
+## 🔐 Configuração do JWT
+
+O `appsettings.json` contém as configurações não sensíveis do JWT:
+
+```json
+"Jwt": {
+  "SecretKey": "",
+  "Issuer": "UserManagement.API",
+  "Audience": "UserManagement.Client",
+  "ExpirationInMinutes": 60
+}
+```
+
+A `SecretKey` deve ser configurada via **User Secrets** (desenvolvimento) ou **variável de ambiente** (produção):
+
+```bash
+# Desenvolvimento
+dotnet user-secrets set "Jwt:SecretKey" "<sua-chave>" --project src/UserManagement.API
+
+# Produção — o .NET mapeia __ como separador de seção automaticamente
+Jwt__SecretKey=<sua-chave>
+```
 
 ---
 
@@ -237,25 +334,32 @@ crud/
 │   │   │   └── User.cs
 │   │   ├── ValueObjects/
 │   │   │   ├── Email.cs
-│   │   │   └── Name.cs
+│   │   │   ├── Name.cs
+│   │   │   └── Password.cs
 │   │   └── Exceptions/
 │   │       ├── DomainException.cs
-│   │       └── NotFoundException.cs
+│   │       ├── NotFoundException.cs
+│   │       └── UnauthorizedException.cs
 │   │
 │   ├── UserManagement.Application/
 │   │   ├── DTOs/
+│   │   │   ├── AuthResponse.cs
 │   │   │   ├── CreateUserRequest.cs
+│   │   │   ├── LoginRequest.cs
 │   │   │   ├── UpdateUserRequest.cs
 │   │   │   └── UserResponse.cs
 │   │   ├── Extensions/
 │   │   │   └── UserExtensions.cs
 │   │   ├── Interfaces/
+│   │   │   ├── IJwtTokenGenerator.cs
+│   │   │   ├── IPasswordHasher.cs
 │   │   │   └── IUserRepository.cs
 │   │   ├── UseCases/
 │   │   │   ├── CreateUserUseCase.cs
 │   │   │   ├── DeleteUserUseCase.cs
 │   │   │   ├── GetAllUsersUseCase.cs
 │   │   │   ├── GetUserByIdUseCase.cs
+│   │   │   ├── LoginUseCase.cs
 │   │   │   └── UpdateUserUseCase.cs
 │   │   ├── Validators/
 │   │   │   ├── CreateUserRequestValidator.cs
@@ -269,11 +373,16 @@ crud/
 │   │   │   └── AppDbContext.cs
 │   │   ├── Repositories/
 │   │   │   └── UserRepository.cs
+│   │   ├── Security/
+│   │   │   ├── JwtSettings.cs
+│   │   │   ├── JwtTokenGenerator.cs
+│   │   │   └── PasswordHasher.cs
 │   │   ├── Migrations/
 │   │   └── DependencyInjection.cs
 │   │
 │   └── UserManagement.API/
 │       ├── Controllers/
+│       │   ├── AuthController.cs
 │       │   └── UsersController.cs
 │       ├── Middlewares/
 │       │   └── ExceptionHandlingMiddleware.cs
@@ -289,4 +398,3 @@ crud/
             ├── GetUserByIdUseCaseTests.cs
             └── UpdateUserUseCaseTests.cs
 ```
-
