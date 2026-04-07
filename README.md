@@ -306,6 +306,130 @@ Jwt__SecretKey=<sua-chave>
 
 ---
 
+## 🔑 Como o JWT funciona neste projeto
+
+### Visão geral do fluxo
+
+```
+1. Cliente envia POST /api/auth/login  { email, password }
+          ↓
+2. AuthController → LoginUseCase
+          ↓
+3. Busca o usuário pelo e-mail no banco (IUserRepository)
+          ↓
+4. Verifica a senha com BCrypt (IPasswordHasher)
+          ↓
+5. Gera o token JWT (IJwtTokenGenerator)
+          ↓
+6. Retorna { token, expiresAt }
+
+─────────────────────────────────────────────────────────
+
+7. Cliente envia GET /api/users
+   Header: Authorization: Bearer <token>
+          ↓
+8. JwtBearer Middleware intercepta a requisição
+   └── Valida assinatura, issuer, audience e expiração
+          ↓
+9. [Authorize] verifica se o usuário está autenticado
+          ↓
+10. Controller executa normalmente
+```
+
+---
+
+### Estrutura do token
+
+Um token JWT é composto por 3 partes separadas por `.`, todas em Base64:
+
+```
+eyJhbGciOiJIUzI1NiJ9          ← Header  (algoritmo: HS256)
+.eyJzdWIiOiIxMjM0In0           ← Payload (claims: sub, email, jti, exp...)
+.SflKxwRJSMeKKF2QT4fwpMeJf36   ← Signature (HMAC-SHA256 da chave secreta)
+```
+
+Os **claims** embutidos no payload deste projeto são:
+
+| Claim | Valor | Descrição |
+|---|---|---|
+| `sub` | `user.Id` | Identificador do usuário (padrão JWT) |
+| `email` | `user.Email.Value` | E-mail do usuário |
+| `jti` | `Guid.NewGuid()` | ID único do token — útil para revogação futura |
+| `exp` | `UtcNow + ExpirationInMinutes` | Data/hora de expiração |
+
+---
+
+### Como a Clean Architecture foi respeitada
+
+O grande desafio ao implementar JWT com Clean Architecture é **não vazar detalhes de infraestrutura para as camadas internas**. Veja como foi resolvido:
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Application                                         │
+│                                                     │
+│  LoginUseCase                                       │
+│    └── chama IJwtTokenGenerator.GenerateToken()     │  ← interface, sem saber o que é JWT
+│          └── retorna AuthResponse                   │
+└─────────────────────────────────────────────────────┘
+                         ↑ depende da abstração
+┌─────────────────────────────────────────────────────┐
+│ Infrastructure                                      │
+│                                                     │
+│  JwtTokenGenerator : IJwtTokenGenerator             │
+│    └── usa System.IdentityModel.Tokens.Jwt          │  ← detalhe de infra isolado aqui
+│    └── lê JwtSettings via IOptions<JwtSettings>     │
+└─────────────────────────────────────────────────────┘
+```
+
+A camada **Application nunca referencia** `System.IdentityModel`, `JwtSecurityToken` ou qualquer detalhe de JWT — ela só conhece `IJwtTokenGenerator` e `AuthResponse`.
+
+---
+
+### Por que o `GenerateToken` retorna `AuthResponse` e não `string`?
+
+Retornar apenas a `string` do token forçaria o `LoginUseCase` a calcular o `expiresAt` por conta própria — o que exigiria que ele conhecesse o valor de `ExpirationInMinutes`, uma configuração que pertence à Infrastructure.
+
+Retornando `AuthResponse` diretamente, o `JwtTokenGenerator` calcula `expiresAt` **uma única vez** e usa o mesmo valor tanto para o token (`expires:`) quanto para a resposta ao cliente — garantindo consistência:
+
+```csharp
+// JwtTokenGenerator.cs
+var expiresAt = DateTime.UtcNow.AddMinutes(_settings.ExpirationInMinutes);
+
+var token = new JwtSecurityToken(expires: expiresAt, ...); // ← mesmo valor
+return new AuthResponse(tokenString, expiresAt);           // ← mesmo valor
+```
+
+---
+
+### Validação automática pelo middleware
+
+Ao chamar `app.UseAuthentication()` no pipeline, o ASP.NET Core intercepta **toda requisição** e, se houver um header `Authorization: Bearer <token>`, valida automaticamente:
+
+| Validação | O que verifica |
+|---|---|
+| `ValidateIssuerSigningKey` | A assinatura foi gerada com a `SecretKey` correta |
+| `ValidateIssuer` | O token foi emitido por `UserManagement.API` |
+| `ValidateAudience` | O token é destinado a `UserManagement.Client` |
+| `ValidateLifetime` | O token não está expirado (`exp` > agora) |
+
+Se qualquer validação falhar, o middleware retorna **401 Unauthorized** antes mesmo de chegar ao controller — sem nenhum código adicional necessário.
+
+---
+
+### Proteção dos endpoints
+
+O atributo `[Authorize]` no `UsersController` instrui o ASP.NET Core a exigir um token válido em todos os seus endpoints. O `AuthController` não tem esse atributo pois precisa ser público (é ele quem fornece o token):
+
+```csharp
+[Authorize]          // ← todos os endpoints de /api/users exigem token
+public sealed class UsersController : ControllerBase { ... }
+
+// sem [Authorize]   ← /api/auth/login é público
+public sealed class AuthController : ControllerBase { ... }
+```
+
+---
+
 ## 🧪 Testes
 
 14 testes unitários cobrindo todos os Use Cases:
