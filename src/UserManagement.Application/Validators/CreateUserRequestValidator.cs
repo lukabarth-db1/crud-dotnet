@@ -17,6 +17,11 @@ public sealed class CreateUserRequestValidator : AbstractValidator<CreateUserReq
             .NotEmpty().WithMessage("Email is required.")
             .EmailAddress().WithMessage("A valid email address is required.")
             .MaximumLength(Email.MaxLength).WithMessage($"Email cannot exceed {Email.MaxLength} characters.");
+
+        RuleFor(x => x.Password)
+            .NotEmpty().WithMessage("Password is required.")
+            .MinimumLength(Password.MinLength).WithMessage($"Password must have at least {Password.MinLength} characters.")
+            .MaximumLength(Password.MaxLength).WithMessage($"Password cannot exceed {Password.MaxLength} characters.");
     }
 }
 

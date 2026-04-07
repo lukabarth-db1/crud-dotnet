@@ -29,6 +29,11 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex("_email")
             .IsUnique();
 
+        builder.Property<string>("_passwordHash")
+            .HasColumnName("PasswordHash")
+            .IsRequired()
+            .HasMaxLength(PasswordHash.MaxLength);
+
         builder.Property(u => u.CreatedAt)
             .IsRequired();
 

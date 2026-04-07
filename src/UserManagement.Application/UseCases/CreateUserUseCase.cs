@@ -9,10 +9,12 @@ namespace UserManagement.Application.UseCases;
 public sealed class CreateUserUseCase
 {
     private readonly IUserRepository _userRepository;
+    private readonly IPasswordHasher _passwordHasher;
 
-    public CreateUserUseCase(IUserRepository userRepository)
+    public CreateUserUseCase(IUserRepository userRepository, IPasswordHasher passwordHasher)
     {
         _userRepository = userRepository;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<UserResponse> ExecuteAsync(
@@ -21,7 +23,8 @@ public sealed class CreateUserUseCase
     {
         await EnsureEmailIsUniqueAsync(request.Email, cancellationToken);
 
-        var user = User.Create(request.Name, request.Email);
+        var passwordHash = _passwordHasher.Hash(request.Password);
+        var user = User.Create(request.Name, request.Email, passwordHash);
 
         await _userRepository.AddAsync(user, cancellationToken);
 
@@ -36,5 +39,3 @@ public sealed class CreateUserUseCase
             throw new DomainException($"Email '{email}' is already in use.");
     }
 }
-
-

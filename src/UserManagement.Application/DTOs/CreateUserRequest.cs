@@ -1,4 +1,4 @@
 namespace UserManagement.Application.DTOs;
 
-public sealed record CreateUserRequest(string Name, string Email);
+public sealed record CreateUserRequest(string Name, string Email, string Password);
 
