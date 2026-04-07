@@ -10,19 +10,22 @@ namespace UserManagement.Tests.UseCases;
 public sealed class CreateUserUseCaseTests
 {
     private readonly Mock<IUserRepository> _repositoryMock;
+    private readonly Mock<IPasswordHasher> _passwordHasherMock;
     private readonly CreateUserUseCase _useCase;
 
     public CreateUserUseCaseTests()
     {
         _repositoryMock = new Mock<IUserRepository>();
-        _useCase = new CreateUserUseCase(_repositoryMock.Object);
+        _passwordHasherMock = new Mock<IPasswordHasher>();
+        _passwordHasherMock.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed_password");
+        _useCase = new CreateUserUseCase(_repositoryMock.Object, _passwordHasherMock.Object);
     }
 
     [Fact]
     public async Task ExecuteAsync_ShouldCreateUser_WhenRequestIsValid()
     {
         // Arrange
-        var request = new CreateUserRequest("Joao Silva", "joao@email.com");
+        var request = new CreateUserRequest("Joao Silva", "joao@email.com", "senha1234");
 
         _repositoryMock
             .Setup(r => r.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
@@ -49,8 +52,8 @@ public sealed class CreateUserUseCaseTests
     public async Task ExecuteAsync_ShouldThrowDomainException_WhenEmailAlreadyExists()
     {
         // Arrange
-        var request = new CreateUserRequest("Joao Silva", "joao@email.com");
-        var existingUser = User.Create("Maria", "joao@email.com");
+        var request = new CreateUserRequest("Joao Silva", "joao@email.com", "senha1234");
+        var existingUser = User.Create("Maria", "joao@email.com", "hashed_password");
 
         _repositoryMock
             .Setup(r => r.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
@@ -70,7 +73,7 @@ public sealed class CreateUserUseCaseTests
     public async Task ExecuteAsync_ShouldThrowDomainException_WhenNameIsTooShort()
     {
         // Arrange
-        var request = new CreateUserRequest("X", "joao@email.com");
+        var request = new CreateUserRequest("X", "joao@email.com", "senha1234");
 
         _repositoryMock
             .Setup(r => r.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
@@ -88,7 +91,7 @@ public sealed class CreateUserUseCaseTests
     public async Task ExecuteAsync_ShouldThrowDomainException_WhenEmailIsInvalid()
     {
         // Arrange
-        var request = new CreateUserRequest("Joao Silva", "email-invalido");
+        var request = new CreateUserRequest("Joao Silva", "email-invalido", "senha1234");
 
         _repositoryMock
             .Setup(r => r.GetByEmailAsync(request.Email, It.IsAny<CancellationToken>()))

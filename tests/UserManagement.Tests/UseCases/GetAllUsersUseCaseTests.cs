@@ -22,9 +22,9 @@ public sealed class GetAllUsersUseCaseTests
         // Arrange
         var users = new List<User>
         {
-            User.Create("Ana Silva", "ana@email.com"),
-            User.Create("Bruno Costa", "bruno@email.com"),
-            User.Create("Carlos Lima", "carlos@email.com"),
+            User.Create("Ana Silva", "ana@email.com", "hashed_password"),
+            User.Create("Bruno Costa", "bruno@email.com", "hashed_password"),
+            User.Create("Carlos Lima", "carlos@email.com", "hashed_password"),
         };
 
         _repositoryMock

@@ -22,7 +22,7 @@ public sealed class UpdateUserUseCaseTests
     public async Task ExecuteAsync_ShouldUpdateUser_WhenRequestIsValid()
     {
         // Arrange
-        var user = User.Create("Joao Silva", "joao@email.com");
+        var user = User.Create("Joao Silva", "joao@email.com", "hashed_password");
         var request = new UpdateUserRequest("Joao Santos", "joao.santos@email.com");
 
         _repositoryMock
@@ -52,7 +52,7 @@ public sealed class UpdateUserUseCaseTests
     public async Task ExecuteAsync_ShouldAllowSameEmail_WhenEmailBelongsToSameUser()
     {
         // Arrange
-        var user = User.Create("Joao Silva", "joao@email.com");
+        var user = User.Create("Joao Silva", "joao@email.com", "hashed_password");
         var request = new UpdateUserRequest("Joao Santos", "joao@email.com");
 
         _repositoryMock
@@ -98,8 +98,8 @@ public sealed class UpdateUserUseCaseTests
     public async Task ExecuteAsync_ShouldThrowDomainException_WhenEmailBelongsToAnotherUser()
     {
         // Arrange
-        var user = User.Create("Joao Silva", "joao@email.com");
-        var otherUser = User.Create("Maria Lima", "maria@email.com");
+        var user = User.Create("Joao Silva", "joao@email.com", "hashed_password");
+        var otherUser = User.Create("Maria Lima", "maria@email.com", "hashed_password");
         var request = new UpdateUserRequest("Joao Santos", "maria@email.com");
 
         _repositoryMock
@@ -119,4 +119,3 @@ public sealed class UpdateUserUseCaseTests
         _repositoryMock.Verify(r => r.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }
-

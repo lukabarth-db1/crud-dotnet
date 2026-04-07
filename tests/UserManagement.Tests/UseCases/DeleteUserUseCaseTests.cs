@@ -21,7 +21,7 @@ public sealed class DeleteUserUseCaseTests
     public async Task ExecuteAsync_ShouldDeleteUser_WhenUserExists()
     {
         // Arrange
-        var user = User.Create("Joao Silva", "joao@email.com");
+        var user = User.Create("Joao Silva", "joao@email.com", "hashed_password");
 
         _repositoryMock
             .Setup(r => r.GetByIdAsync(user.Id, It.IsAny<CancellationToken>()))
